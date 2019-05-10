@@ -1,0 +1,7 @@
+[package]
+name = "moonwalk"
+version = "0.1.0"
+authors = ["mjrb <www.w.com123@gmail.com>"]
+edition = "2018"
+
+[dependencies]
