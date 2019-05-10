@@ -1,0 +1,113 @@
+Moonwalk interpreter/compiler.
+
+1. Contents
+2. Description
+3. Related languages
+4. Grammar
+5. Implementation
+6. Stretch goals/ideas
+7. Example program(s)
+
+Description:
+moonwalk is a silly idea I had for a programming language, which allows the
+program to decide to execute backwards or forwards. I don't think this is very
+useful or applicable at all it's just something I thought might be interesting.
+
+Related languages:
+the idea of a reversible program counter is not original. there are 2d languages
+like https://esolangs.org/wiki/Befunge that allow you to move the pc direction
+up, down, left, and right. moonwalk has the added twist of instructions changing
+behavior depending on pc direction. namely when forward += and jump works
+normally and from lines are ignored, when reversed jumps are ignored, += acts
+like -=, and from acts like jump.
+
+Grammar:
+the virtual machine as 4 registers A through D and addressable memory
+HEX = 0x[0-9A-F]+
+DEC = [0-9]+
+LABEL = [a-zA-Z0-9\-]+
+
+REG = A | B | C | D
+ADDR = <HEX> | <DEC>
+LITERAL = $(<HEX> | <DEC>)
+
+SOURCE = <REG> | <ADDR> | <LITERAL> | \(<SOURCE>\)
+DEST = <REG> | <ADDR> | \(<DEST>\)
+
+INCREMENT = <DEST> += <LITERAL>
+
+JUMP = jmp <LABEL>?
+jump to label.
+if label isn't present, jump to the last from that got us here
+ignored when reversed.
+
+FROM = from <LABEL>?
+similar to jump but ignored moving forward. an interesting consequence of how
+from and jmp are defined is that every jmp or from line has its own call stack.
+
+
+INSTRUCTION = <INCREMENT> | <JUMP> | <FROM> | <HALT>
+COMMENT = ;.*
+CONDITION-EXP = backwards
+	      | forwards
+	      | \(<CONDITION-EXP>\)
+	      | <CONDITION-EXP> (and | or) <CONDITION-EXP>
+	      | <SOURCE> (< | >)?=? <SOURCE>
+
+LINE = <LABEL>: <INSTRUCTION> (if <CONDITION-EXP>)
+PROGRAM = (<LINE> | <COMMENT>)*
+
+Implementation:
+I want to implement an interpreter for this language in rust. I've been curious
+about the language for a while and learned the syntax and basic concepts but
+this would be a chance to drill into it. The most interesting feature for me is
+the borrow checker for tracking memory usage. It's an alternative to GC, ARC, or
+manual memory management that functions somewhat like unique_ptr in c++, but is
+a default and native language construct like GC. It also has algebraic types
+like Haskell and it would be interesting to see how i could apply them.
+
+I'm not sure if I'm going to work in a group yet but I'm leaning no because my
+friends who I'd work with seem to be interested in a slightly different project
+
+Stretch goals/ideas:
+it may be interesting to create a compiler for this would be interesting but
+I've never written an assembly or llvm generator before, but it would likely be
+easy for this language since its very simple and resembles assembly already.
+a program would have a section with the entire program forward, a section with
+the entire program backward, and a section that evaluates if clauses. reversing
+the program counter would translate to jumping into the backward section in the
+binary.
+
+A more attainable goal would be to add move and unmove instructions that have
+similar functionality to jump and from, but instead of having a call stack or
+history it would have a value stack or history for an address or register.
+
+Example program(s):
+;; example function
+inc-car: from
+(A) += 1 if forward
+backwards
+
+;; example calling function
+A += $2 ; a points to address 2
+from after-call if backwards
+jump inc-car
+forwards
+after-call: jump
+
+;; c = a / b
+c-eq-a-div-b: from
+;; c=0;
+from after-zeroc
+c += c if backwards
+backwards
+after-zero-c: forwards
+
+;; while (a < b) {a-=b; c++}
+jump start-div
+forwards
+c += 1 if forwards
+jump start-div
+a += b
+from c-eq-a-div-b if a < b
+start-div: backwards
