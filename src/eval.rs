@@ -33,9 +33,15 @@ pub fn eval_expr(expr: ast::Expr, ctx: &Context) -> bool {
     return false;
 }
 
+pub enum ScanResult {
+    Missing(Vec<String>),
+    Unused(Vec<String>, HashMap<String, usize>),
+    Ok(HashMap<String, usize>)
+}
+
 // scan a program to get label lookup table
-pub fn scan_labels(program: &Vec<ast::Line>) -> HashMap<String, usize> {
-    return HashMap::new();
+pub fn scan_labels(program: &Vec<ast::Line>) -> ScanResult {
+    return ScanResult::Ok(HashMap::new());
 }
 
 // evaluate a program
