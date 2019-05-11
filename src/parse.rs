@@ -1,9 +1,9 @@
-mod ast;
+use crate::ast;
 
-pub fn lex(input: [char]) -> Vec<self::ast::Token> {
+pub fn lex(input: String) -> Vec<ast::Token> {
     return vec![];
 }
 
-pub fn parse(tokens: Vec<self::ast::Token>) -> Vec<self::ast::Line> {
+pub fn parse(tokens: Vec<ast::Token>) -> Vec<ast::Line> {
     return vec![];
 }
