@@ -47,6 +47,9 @@ pub enum Instruction {
     Inc(Dest, Source),
     Jump(Option<String>),
     From(Option<String>),
+    Forwards,
+    Backwards,
+    Reverse,
     Halt
 }
 
