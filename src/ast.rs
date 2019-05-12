@@ -52,7 +52,12 @@ pub enum Expr {
     Forwards,
     Or(Box<Expr>, Box<Expr>),
     And(Box<Expr>, Box<Expr>),
-    
+    Gte(Box<Expr>, Box<Expr>),
+    Lte(Box<Expr>, Box<Expr>),
+    Gt(Box<Expr>, Box<Expr>),
+    Lt(Box<Expr>, Box<Expr>),
+    Eq(Box<Expr>, Box<Expr>),
+    Lit(Source),
 }
 
 pub struct Line {
