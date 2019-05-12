@@ -3,6 +3,7 @@ pub enum Register {
     A, B, C, D
 }
 
+#[derive(Debug)]
 pub enum Token {
     Num(usize),
     Reg(Register),
@@ -18,9 +19,12 @@ pub enum Token {
     Backwards,
     Forwards,
     Reverse,
-    If,
+    If, Eq,
     Gt, Gte,
-    Lt, Lte
+    Lt, Lte,
+    And, Or,
+    Nop,
+    Newlines(usize)
 }
 
 pub enum Dest {
