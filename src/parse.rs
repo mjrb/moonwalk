@@ -88,7 +88,7 @@ pub fn lex(input: String) -> Option<Vec<ast::Token>> {
     });
 
     tokenizer.def_match(
-        r"[\$:\(\)]|jump|from|inc|halt|backwards|forwards|reverse|if|<=|>=|>|=|<|and|or",
+        r"[\$:\(\)]|jump|from|inc|halt|io|backwards|forwards|reverse|if|<=|>=|>|=|<|and|or",
         &|mat: String| {
             match mat.as_ref() {
                 "$" => Literal,
@@ -99,6 +99,7 @@ pub fn lex(input: String) -> Option<Vec<ast::Token>> {
                 "from" => From,
                 "inc" => Inc,
                 "halt" => Halt,
+                "io" => Io,
                 "backwards" => Backwards,
                 "forwards" => Forwards,
                 "reverse" => Reverse,
@@ -234,6 +235,7 @@ pub fn parse_inst(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Instruction, 
                     })
                 })
             },
+            Io => parse_src(&mut q).map(|src| ast::Instruction::Io(src)),
             _ => Err("Not an Instruction")
         }
     }

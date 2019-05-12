@@ -19,6 +19,7 @@ pub enum Token {
     Backwards,
     Forwards,
     Reverse,
+    Io,
     If, Eq,
     Gt, Gte,
     Lt, Lte,
@@ -50,7 +51,8 @@ pub enum Instruction {
     Forwards,
     Backwards,
     Reverse,
-    Halt
+    Halt,
+    Io(Source)
 }
 
 #[derive(Debug)]

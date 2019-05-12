@@ -152,6 +152,7 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
         ast::Instruction::Forwards => panic!("not implemented"),
         ast::Instruction::Backwards => panic!("not implemented"),
         ast::Instruction::Reverse => panic!("not implemented"),
+        ast::Instruction::Io(src) => panic!("not implemented"),
         ast::Instruction::Halt => true,
     }
 }
