@@ -1,0 +1,19 @@
+A += $3;comment
+from after-add2 ;;;doublecoment lmao += 3 if false
+jump add2
+after-add2: forwards
+A += 5 if (A = $2) and (forwards or backwards)
+
+label:
+from
+backwards
+reverse
+B += 0xdeadbeefabcdef
+C += $0xdeadbeefabcdef
+halt
+> >= = <= <
+
+add2: from
+A += 2
+from add2
+backwards
