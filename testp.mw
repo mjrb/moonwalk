@@ -1,0 +1,17 @@
+inc A $3 ;comment
+from after-add2 ;;;doublecoment lmao += 3 if false
+jump add2
+after-add2: forwards
+inc A 5 if forwards
+
+label: from
+backwards
+reverse
+inc B 0xdeadbeefabcdef
+inc C $0xdeadbeefabcdef
+halt
+
+add2: from
+inc A 2
+from add2
+backwards
