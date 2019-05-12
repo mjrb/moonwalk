@@ -151,40 +151,47 @@ pub fn parse_reg(input: &str) -> Option<ast::Register>{
 pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'static str> {
     use crate::ast::Token::{*};
     let mut opens = 0;
-    let mut src = ast::Source::Addr(0);
     while !tokens.is_empty() {
-        src = match tokens.pop_front().unwrap() {
+        match tokens.front().unwrap() {
             Open => {
                 opens += 1;
-                continue;
+                tokens.pop_front();
             },
-            Identifier(ident) => match parse_reg(&ident) {
-                Some(r) => ast::Source::Reg(r),
-                None => return Err("invalid register")
-            },
-            Num(n) => ast::Source::Addr(n),
-            Literal => match tokens.pop_front() {
-                None => return Err("unexpected end of program"),
-                Some(tok) => match tok {
-                    Num(n) => ast::Source::Literal(n),
-                    _ => return Err("expected number after $")
-                }
-            }
-            tok => return Err("invalid source or destination")
-        };
-        break;
-    }
-    let mut closes = 0;
-    while !tokens.is_empty() && closes < opens {
-        match tokens.pop_front().unwrap() {
-            Close => {
-                closes += 1;
-                src = ast::Source::Deref(Box::new(src));
-            },
-            _ => return Err("invalid destination")
+            _ => break // parens are done
         }
     }
-    if closes < opens {
+
+    let mut src = match tokens.pop_front().unwrap() {
+        Identifier(ident) => match parse_reg(&ident) {
+            Some(r) => ast::Source::Reg(r),
+            None => return Err("invalid register")
+        },
+        Num(n) => ast::Source::Addr(n),
+        Literal => match tokens.pop_front() {
+            None => return Err("unexpected end of program"),
+            Some(tok) => match tok {
+                Num(n) => ast::Source::Literal(n),
+                _ => return Err("expected number after $")
+            }
+        }
+        tok => return Err("invalid source or destination")
+    };
+
+    let mut closes = 0;
+    while !tokens.is_empty() {
+        src = match tokens.front().unwrap() {
+            Close => {
+                closes += 1;
+                tokens.pop_front();
+                println!("src {:?}", src);
+                src = ast::Source::Deref(Box::new(src));
+                println!("postsrc {:?}", src);
+                src
+            },
+            _ => {break;}// no more parentheses
+        }
+    }
+    if closes != opens {
         return Err("missmatched parentheses");
     }
     return Ok(src);
@@ -195,7 +202,7 @@ pub fn src2dest(src: ast::Source) -> Result<ast::Dest, &'static str> {
         ast::Source::Literal(_) => Err("Destination Can't Be Literal"),
         ast::Source::Reg(r) => Ok(ast::Dest::Reg(r)),
         ast::Source::Addr(a) => Ok(ast::Dest::Addr(a)),
-        ast::Source::Deref(b) => src2dest(*b)
+        ast::Source::Deref(b) => src2dest(*b).map(|dest| ast::Dest::Deref(Box::new(dest)))
     }
 }
 
@@ -235,7 +242,10 @@ pub fn parse_inst(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Instruction, 
                     })
                 })
             },
-            Io => parse_src(&mut q).map(|src| ast::Instruction::Io(src)),
+            Io => parse_src(&mut q).map(|src| {
+                println!("here");
+                ast::Instruction::Io(src)
+            }),
             _ => Err("Not an Instruction")
         }
     }
@@ -267,11 +277,11 @@ pub fn parse_cond(mut q: &mut VecDeque<ast::Token>) -> Result<Option<ast::Expr>,
     }
 }
 
-pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, &'static str> {
+pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, (usize, &'static str)> {
     use crate::ast::Token::{*};
     let mut q = VecDeque::from(tokens);
     let mut lines = vec![];
-    let mut lineno = 0;
+    let mut lineno = 1;
     let mut src: Option<ast::Source> = None;
     'start: while !q.is_empty() {
         let mut label: Option<String> = None;
@@ -281,7 +291,7 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, &'static str
             Newlines(n) => {
                 lineno += n;
                 match label {
-                    Some(_) => return Err("no newline after label"),
+                    Some(_) => return Err((lineno, "no newline after label")),
                     None => {
                         label = None;
                         continue;
@@ -291,11 +301,11 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, &'static str
             Identifier(ident) => match q.pop_front() {
                 Some(Label) => {
                     match label {
-                        Some(_) => return Err("already labeled"),
+                        Some(_) => return Err((lineno, "already labeled")),
                         None => label = Some(ident.to_string())
                     }
                 },
-                _ => return Err("malformed label")
+                _ => return Err((lineno, "malformed label"))
             },
             tok => q.push_front(tok) // successful label or no label
         }
@@ -305,11 +315,11 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, &'static str
             label,
             inst: match parse_inst(&mut q) {
                 Ok(inst) => inst,
-                Err(e) => return Err(e)
+                Err(e) => return Err((lineno, e))
             },
             cond: match parse_cond(&mut q) {
                 Ok(cond) => cond,
-                Err(e) => return Err(e)
+                Err(e) => return Err((lineno, e))
             }
         });
 
