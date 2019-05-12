@@ -12,17 +12,29 @@ fn moonwalk_main() {
     let args: Vec<String> = env::args().collect();
     let message = format!("Unable to read file {}", args[1]);
     let content = fs::read_to_string(&args[1]).expect(&message);
-    let tokens = self::parse::lex(content);
-    let program = self::parse::parse(tokens);
+    let tokens = match self::parse::lex(content) {
+        Some(toks) => toks,
+        None => {
+            print!("ERROR: bad token");
+            return;
+        }
+    };
+    let program = match self::parse::parse(tokens) {
+        std::result::Result::Ok(prg) => prg,
+        std::result::Result::Err(e) => {
+            println!("PARSE ERROR: {}", e);
+            return;
+        }
+    };
     let labels = match self::eval::scan_labels(&program) {
         eval::ScanResult::Missing(missing) => {
-            print!("ERROR: Missing the folowing labels");
-            print!("{:?}", missing);
+            println!("ERROR: Missing the folowing labels");
+            println!("{:?}", missing);
             return;
         },
         eval::ScanResult::Unused(unused, labels) => {
-            print!("warning: the folowing labels are unused");
-            print!("{:?}", labels);
+            println!("warning: the folowing labels are unused");
+            println!("{:?}", labels);
             labels
         },
         eval::ScanResult::Ok(labels) => labels
