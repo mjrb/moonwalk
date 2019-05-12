@@ -21,8 +21,8 @@ fn moonwalk_main() {
     };
     let program = match self::parse::parse(tokens) {
         std::result::Result::Ok(prg) => prg,
-        std::result::Result::Err(e) => {
-            println!("PARSE ERROR: {}", e);
+        std::result::Result::Err((lineno, e)) => {
+            println!("PARSE ERROR ON LINE {}: {}", lineno, e);
             return;
         }
     };
