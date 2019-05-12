@@ -27,12 +27,14 @@ pub enum Token {
     Newlines(usize)
 }
 
+#[derive(Debug)]
 pub enum Dest {
     Reg(Register),
     Addr(usize),
     Deref(Box<Dest>)
 }
 
+#[derive(Debug)]
 pub enum Source {
     Reg(Register),
     Addr(usize),
@@ -40,6 +42,7 @@ pub enum Source {
     Deref(Box<Source>)
 }
 
+#[derive(Debug)]
 pub enum Instruction {
     Inc(Dest, Source),
     Jump(Option<String>),
@@ -47,6 +50,7 @@ pub enum Instruction {
     Halt
 }
 
+#[derive(Debug)]
 pub enum Expr {
     Backwards,
     Forwards,
@@ -60,6 +64,7 @@ pub enum Expr {
     Lit(Source),
 }
 
+#[derive(Debug)]
 pub struct Line {
     pub label: Option<String>,
     pub inst: Instruction,
