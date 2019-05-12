@@ -24,10 +24,7 @@ impl<'l> TokenMatcher<'l> {
     pub fn try_match(&mut self, iter: &String, tokens: &mut Vec<ast::Token>) -> Option<String>{
         match self.regex.captures(&iter) {
             Some(captures) => {
-                println!("regex {:?}", self.regex);
-                println!("Capt {:?}", captures);
                 if captures[1].to_string() == "".to_string() {
-                    println!("empty");
                     return None
                 }
                 tokens.push(self.on_match.handle(captures[1].to_string()));
@@ -59,7 +56,6 @@ impl<'l> Tokenizer<'l> {
     pub fn tokenize(&mut self, mut input: String) -> Option<Vec<ast::Token>> {
         let mut tokens: Vec<ast::Token> = vec![];
         'start_matching: while input.len() > 0 {
-            println!("Matching '{}'", &input);
             let mut i = 0;
             while i < self.matchers.len() {
                 match self.matchers[i].try_match(&input, &mut tokens) {
@@ -67,13 +63,11 @@ impl<'l> Tokenizer<'l> {
                         input = new_input;
                         continue 'start_matching;
                     },
-                    None => {
-                        println!("nomatch {:?}", self.matchers[i].regex);
-                    }
+                    None => ()
                 };
                 i+=1;
             }
-            println!("no match");
+            // no match
             return None
         }
         return Some(tokens);
@@ -122,7 +116,6 @@ pub fn lex(input: String) -> Option<Vec<ast::Token>> {
     );
 
     tokenizer.def_match(r"[a-zA-Z\-0-9]+", &|mat: String| {
-        println!("MATCH ident");
         Identifier(mat)
     });
 
@@ -176,8 +169,9 @@ pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'sta
                     _ => return Err("expected number after $")
                 }
             }
-            _ => return Err("invalid destination")
-        }
+            tok => return Err("invalid source or destination")
+        };
+        break;
     }
     let mut closes = 0;
     while !tokens.is_empty() && closes < opens {
@@ -226,15 +220,20 @@ pub fn parse_inst(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Instruction, 
         None => Err("unexpected end of program"),
         Some(tok) => match tok {
             Halt => Ok(ast::Instruction::Halt),
+            Backwards => Ok(ast::Instruction::Backwards),
+            Forwards => Ok(ast::Instruction::Forwards),
+            Reverse => Ok(ast::Instruction::Reverse),
             Jump => Ok(ast::Instruction::Jump(pop_if_ident(&mut q))),
             From => Ok(ast::Instruction::From(pop_if_ident(&mut q))),
-            Inc => parse_src(&mut q)
+            Inc => {
+                parse_src(&mut q)
                 .and_then(|src| src2dest(src))
                 .and_then(|dest| {
                     parse_src(&mut q).map(|src| {
                         ast::Instruction::Inc(dest, src)
                     })
-                }),
+                })
+            },
             _ => Err("Not an Instruction")
         }
     }
@@ -245,14 +244,22 @@ pub fn parse_expr(q: &mut VecDeque<ast::Token>) -> Result<ast::Expr, &'static st
 }
 
 pub fn parse_cond(mut q: &mut VecDeque<ast::Token>) -> Result<Option<ast::Expr>, &'static str> {
+    use crate::ast::Token::{*};
+    // clear writespace or comments
+    while !q.is_empty() {
+        match q.front_mut().unwrap() {
+            Nop => {q.pop_front();}
+            _ => {break;}
+        }
+    }
     match q.front_mut() {
         None => Ok(None),
         Some(tok) => match tok {
             If => {
                 q.pop_front();
                 parse_expr(&mut q).map(|expr| Some(expr))
-            },
-            Newline => Ok(None),
+            }
+            Newlines(_) => Ok(None),
             _ => Err("Expected if condition or newline")
         }
     }
@@ -288,7 +295,7 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, &'static str
                 },
                 _ => return Err("malformed label")
             },
-            _ => () // successful label or no label
+            tok => q.push_front(tok) // successful label or no label
         }
 
         // read instruction
@@ -302,7 +309,7 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, &'static str
                 Ok(cond) => cond,
                 Err(e) => return Err(e)
             }
-        })
+        });
 
     }
     return Ok(lines);
