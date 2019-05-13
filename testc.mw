@@ -1,0 +1,1 @@
+halt if (*B >=5 or A = 3) and forwards ;; comment
