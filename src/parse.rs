@@ -250,10 +250,7 @@ pub fn parse_cond(mut q: &mut VecDeque<ast::Token>) -> Result<Option<ast::Expr>,
                 parse_expr(&mut q).map(|expr| Some(expr))
             }
             Newlines(_) => Ok(None),
-            _ => {
-                println!("{:?}",q);
-                Err("Expected if condition or newline")
-            }
+            _ => Err("Expected if condition or newline")
         }
     }
 }
