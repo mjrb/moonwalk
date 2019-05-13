@@ -11,6 +11,11 @@ inc B 0xdeadbeefabcdef
 inc C $0xdeadbeefabcdef
 halt
 
+;;print a
+forwards
+io A if backwards
+backwards
+
 add2: from
 inc A 2
 from add2

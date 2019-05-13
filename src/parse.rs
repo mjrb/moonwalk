@@ -88,13 +88,14 @@ pub fn lex(input: String) -> Option<Vec<ast::Token>> {
     });
 
     tokenizer.def_match(
-        r"[\$:\(\)]|jump|from|inc|halt|io|backwards|forwards|reverse|if|<=|>=|>|=|<|and|or",
+        r"[\$:\(\)\*]|jump|from|inc|halt|io|backwards|forwards|reverse|if|<=|>=|>|=|<|and|or",
         &|mat: String| {
             match mat.as_ref() {
                 "$" => Literal,
                 ":" => Label,
                 "(" => Open,
                 ")" => Close,
+                "*" => Deref,
                 "jump" => Jump,
                 "from" => From,
                 "inc" => Inc,
@@ -150,11 +151,11 @@ pub fn parse_reg(input: &str) -> Option<ast::Register>{
 
 pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'static str> {
     use crate::ast::Token::{*};
-    let mut opens = 0;
+    let mut derefs = 0;
     while !tokens.is_empty() {
         match tokens.front().unwrap() {
-            Open => {
-                opens += 1;
+            Deref => {
+                derefs += 1;
                 tokens.pop_front();
             },
             _ => break // parens are done
@@ -177,22 +178,9 @@ pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'sta
         tok => return Err("invalid source or destination")
     };
 
-    let mut closes = 0;
-    while !tokens.is_empty() {
-        src = match tokens.front().unwrap() {
-            Close => {
-                closes += 1;
-                tokens.pop_front();
-                println!("src {:?}", src);
-                src = ast::Source::Deref(Box::new(src));
-                println!("postsrc {:?}", src);
-                src
-            },
-            _ => {break;}// no more parentheses
-        }
-    }
-    if closes != opens {
-        return Err("missmatched parentheses");
+    while derefs > 0 {
+        src = ast::Source::Deref(Box::new(src));
+        derefs -= 1;
     }
     return Ok(src);
 }
@@ -243,7 +231,6 @@ pub fn parse_inst(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Instruction, 
                 })
             },
             Io => parse_src(&mut q).map(|src| {
-                println!("here");
                 ast::Instruction::Io(src)
             }),
             _ => Err("Not an Instruction")
@@ -251,8 +238,148 @@ pub fn parse_inst(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Instruction, 
     }
 }
 
-pub fn parse_expr(q: &mut VecDeque<ast::Token>) -> Result<ast::Expr, &'static str> {
-    return Ok(ast::Expr::Backwards);
+pub enum ExprType {
+    None,
+    Terminal,
+    NonTerminal
+}
+
+pub fn expr_type(tok: &ast::Token) -> ExprType {
+    use crate::ast::Token::{*};
+    match tok {
+        Identifier(ident) => ExprType::Terminal,
+        Backwards => ExprType::Terminal,
+        Forwards => ExprType::Terminal,
+        Literal => ExprType::Terminal,
+        Num(_) => ExprType::Terminal,
+        Close => ExprType::Terminal,
+        Deref => ExprType::Terminal,
+        Open => ExprType::NonTerminal,
+        Or | And => ExprType::NonTerminal,
+        Gt | Gte | Eq | Lte | Lt => ExprType::NonTerminal,
+        _ => ExprType::None
+    }
+}
+
+pub fn precedence(a: &ast::Token) -> usize {
+    use crate::ast::Token::{*};
+    match a {
+        Open => 0,
+        Gte | Gt | Eq | Lt | Lte => 3,
+        And => 2,
+        Or => 1,
+        _ => 5,
+    }
+}
+pub fn op_map(tok: ast::Token, a: ast::Expr, b: ast::Expr) -> Option<ast::Expr> {
+    use crate::ast::Token::{*};
+    let ba = Box::new(a);
+    let bb = Box::new(b);
+
+    Some(match tok {
+        Or => ast::Expr::Or(ba, bb),
+        And => ast::Expr::And(ba, bb),
+        Gte => ast::Expr::Gte(ba, bb),
+        Gt => ast::Expr::Gt(ba, bb),
+        Eq => ast::Expr::Eq(ba, bb),
+        Lt => ast::Expr::Lt(ba, bb),
+        Lte => ast::Expr::Lte(ba, bb),
+        _ => return None
+    })
+}
+
+pub fn op_pop(operators: &mut Vec<ast::Token>, operands: &mut Vec<ast::Expr>) ->
+    Result<(), &'static str>
+{
+    let top = match operators.pop() {
+        Some(op) => op,
+        None => return Err("mismatched Parentheses")
+    };
+    let b = match operands.pop() {
+        Some(expr) => expr,
+        None => return Err("malformed expression, not enough operands")
+    };
+    let a = match operands.pop() {
+        Some(expr) => expr,
+        None => return Err("malformed expression, not enough operands")
+    };
+    return Ok(operands.push(match op_map(top, a, b) {
+        Some(res) => res,
+        None => return Err("malformed expression, Invalid operator")
+    }));
+}
+
+pub fn parse_expr(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Expr, &'static str> {
+    use crate::ast::Token::{*};
+    let mut operands: Vec<ast::Expr> = vec![];
+    let mut operators: Vec<ast::Token> = vec![];
+
+    // and now for the tricky bit
+    while !q.is_empty() {
+        match expr_type(q.front().unwrap()) {
+            ExprType::None => {break;},
+            ExprType::Terminal => {
+                match q.front().unwrap() {
+                    Backwards => {
+                        q.pop_front();
+                        operands.push(ast::Expr::Backwards);
+                    },
+                    Forwards => {
+                        q.pop_front();
+                        operands.push(ast::Expr::Forwards);
+                    },
+                    Close => {
+                        q.pop_front();
+                        loop {
+                            match operators[operators.len() - 1] {
+                                Open => {
+                                    operators.pop();
+                                    break;
+                                },
+                                _ => match op_pop(&mut operators, &mut operands){
+                                    Ok(res) => continue,
+                                    Err(e) => return Err(e)
+                                }
+                            };
+                        };
+                    }
+                    _ => match parse_src(&mut q) {
+                        Ok(src) => operands.push(ast::Expr::Lit(src)),
+                        Err(e) => return Err(e)
+                    }
+                };
+            }
+            ExprType::NonTerminal => {
+                match q.front().unwrap() {
+                    Open => operators.push(q.pop_front().unwrap()),
+                    _ => {
+                        while (operators.len() > 0) {
+                            let top = &operators[operators.len() - 1];
+                            if(precedence(top) < precedence(q.front().unwrap())) {
+                                break;
+                            }
+                            match op_pop(&mut operators, &mut operands){
+                                Ok(res) => res,
+                                Err(e) => return Err(e)
+                            };
+                        }
+                        operators.push(q.pop_front().unwrap());
+                    }
+                }
+            }
+        }
+    }
+    // final eval
+    while operators.len() > 0 {
+        match op_pop(&mut operators, &mut operands){
+            Ok(res) => res,
+            Err(e) => return Err(e)
+        };
+    }
+    if operands.len() != 1 {
+        return Err("malformed expression")
+    }
+    return Ok(operands.pop().unwrap());
 }
 
 pub fn parse_cond(mut q: &mut VecDeque<ast::Token>) -> Result<Option<ast::Expr>, &'static str> {

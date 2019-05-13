@@ -1,1 +1,6 @@
-lmao: inc A 3
+lmao: inc **A 3
+inc B $0xdeadbeef
+inc C 0xdeadbeef
+inc D $10
+inc D 10
+inc *D *0x9

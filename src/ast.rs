@@ -12,6 +12,7 @@ pub enum Token {
     Label,
     Open,
     Close,
+    Deref,
     Jump,
     From,
     Inc,
@@ -66,7 +67,7 @@ pub enum Expr {
     Gt(Box<Expr>, Box<Expr>),
     Lt(Box<Expr>, Box<Expr>),
     Eq(Box<Expr>, Box<Expr>),
-    Lit(Source),
+    Lit(Source)
 }
 
 #[derive(Debug)]
