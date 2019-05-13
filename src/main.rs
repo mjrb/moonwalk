@@ -6,13 +6,14 @@ use std::collections::HashMap;
 //mod bf;
 mod ast;
 mod parse;
+mod lex;
 mod eval;
 
 fn moonwalk_main() {
     let args: Vec<String> = env::args().collect();
     let message = format!("Unable to read file {}", args[1]);
     let content = fs::read_to_string(&args[1]).expect(&message);
-    let tokens = match self::parse::lex(content) {
+    let tokens = match self::lex::lex(content) {
         Some(toks) => toks,
         None => {
             print!("ERROR: bad token");
@@ -34,7 +35,7 @@ fn moonwalk_main() {
         },
         eval::ScanResult::Unused(unused, labels) => {
             println!("warning: the folowing labels are unused");
-            println!("{:?}", labels);
+            println!("{:?}", unused);
             labels
         },
         eval::ScanResult::Ok(labels) => labels
@@ -44,8 +45,8 @@ fn moonwalk_main() {
 }
 
 fn main() {
-    //moonwalk_main();
-    infinite10();
+    moonwalk_main();
+    //infinite10();
 }
 
 fn infinite10(){
