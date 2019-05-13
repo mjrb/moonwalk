@@ -149,11 +149,36 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
             }
             false
         },
-        ast::Instruction::Forwards => panic!("not implemented"),
-        ast::Instruction::Backwards => panic!("not implemented"),
-        ast::Instruction::Reverse => panic!("not implemented"),
-        ast::Instruction::Io(src) => panic!("not implemented"),
-        ast::Instruction::Halt => true,
+        ast::Instruction::Forwards => {
+            ctx.forward = true;
+            false
+        },
+        ast::Instruction::Backwards => {
+            ctx.forward = false;
+            false
+        },
+        ast::Instruction::Reverse => {
+            ctx.forward = !ctx.forward;
+            false
+        },
+        ast::Instruction::Io(src) => {
+            let val = source_to_val(src, ctx);
+            if(ctx.forward){
+                println!("{}", val);
+            }
+            else{
+                panic!("Cannot take input");
+                //match src{
+                //    ast::Source::Literal => panic!("Cannot place input into a literal"),
+                //
+                //}
+            }
+            false
+        },
+        ast::Instruction::Halt => {
+            println!("Program Halted");
+            true
+        },
     }
 }
 
