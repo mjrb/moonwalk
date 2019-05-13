@@ -1,153 +1,7 @@
-use std::str::FromStr;
 use std::result::Result;
 use std::collections::VecDeque;
 
-extern crate regex;
-use regex::Regex;
-
 use crate::ast;
-
-trait MatchHandler {
-    fn handle(&self, mat: String) -> ast::Token;
-}
-
-impl<F> MatchHandler for F where F: Fn(String) -> ast::Token {
-    fn handle(&self, mat: String) -> ast::Token {self(mat)}
-}
-
-struct TokenMatcher<'l> {
-    regex: Regex,
-    on_match: &'l MatchHandler
-}
-
-impl<'l> TokenMatcher<'l> {
-    pub fn try_match(&mut self, iter: &String, tokens: &mut Vec<ast::Token>) -> Option<String>{
-        match self.regex.captures(&iter) {
-            Some(captures) => {
-                if captures[1].to_string() == "".to_string() {
-                    return None
-                }
-                tokens.push(self.on_match.handle(captures[1].to_string()));
-                Some(captures[2].to_string())
-            }
-            None => None
-        }
-    }
-}
-
-struct Tokenizer<'l> {
-    matchers: Vec<TokenMatcher<'l>>
-}
-
-impl<'l> Tokenizer<'l> {
-    pub fn new() -> Tokenizer<'l> {
-        return Tokenizer{matchers: Vec::new()};
-    }
-    pub fn def_match<F>(&mut self, sregex: &str, on_match: &'l F) ->
-        std::result::Result<(), regex::Error>
-        where F: MatchHandler
-    {
-        let formatted = &format!(r"^[ ]*({})(?s)(.*)$", sregex.to_string());
-        Regex::new(formatted).map(|regex| {
-            self.matchers.push(TokenMatcher{regex, on_match})
-        })
-    }
-
-    pub fn tokenize(&mut self, mut input: String) -> Option<Vec<ast::Token>> {
-        let mut tokens: Vec<ast::Token> = vec![];
-        'start_matching: while input.len() > 0 {
-            let mut i = 0;
-            while i < self.matchers.len() {
-                match self.matchers[i].try_match(&input, &mut tokens) {
-                    Some(new_input) => {
-                        input = new_input;
-                        continue 'start_matching;
-                    },
-                    None => ()
-                };
-                i+=1;
-            }
-            // no match
-            return None
-        }
-        return Some(tokens);
-    }
-}
-
-pub fn lex(input: String) -> Option<Vec<ast::Token>> {
-    let mut result: Vec<ast::Token> = vec![];
-    let mut tokenizer = Tokenizer::new();
-    use crate::ast::Token::{*};
-
-    tokenizer.def_match(r"0x[0-9a-fA-F]+", &|mat: String| {
-        Num(usize::from_str_radix(&mat[2..], 16).unwrap())
-    });
-
-    tokenizer.def_match(r"[0-9]+", &|mat: String| {
-        Num(usize::from_str(&mat).unwrap())
-    });
-
-    tokenizer.def_match(
-        r"[\$:\(\)\*]|jump|from|inc|halt|io|backwards|forwards|reverse|if|<=|>=|>|=|<|and|or",
-        &|mat: String| {
-            match mat.as_ref() {
-                "$" => Literal,
-                ":" => Label,
-                "(" => Open,
-                ")" => Close,
-                "*" => Deref,
-                "jump" => Jump,
-                "from" => From,
-                "inc" => Inc,
-                "halt" => Halt,
-                "io" => Io,
-                "backwards" => Backwards,
-                "forwards" => Forwards,
-                "reverse" => Reverse,
-                "if" => If,
-                ">=" => Gte,
-                "<=" => Lte,
-                ">" => Gt,
-                "=" => Eq,
-                "<" => Lt,
-                "and" => And,
-                "or" => Or,
-                _ => Nop // wont happen, guarded by regex
-            }
-        }
-    );
-
-    tokenizer.def_match(r"[a-zA-Z\-0-9]+", &|mat: String| {
-        Identifier(mat)
-    });
-
-    // End of line comment
-    tokenizer.def_match(r";.*", &|mat: String| {
-        Nop
-    });
-
-    tokenizer.def_match(r"\n+", &|mat: String| {
-        Newlines(mat.len())
-    });
-
-    tokenizer.def_match(r"\s*", &|mat: String| {
-        Nop
-    });
-
-    return tokenizer.tokenize(input);
-}
-
-pub fn parse_reg(input: &str) -> Option<ast::Register>{
-    use crate::ast::Register::{*};
-    match input {
-        "A" => Some(A),
-        "B" => Some(B),
-        "C" => Some(C),
-        "D" => Some(D),
-        _ => None,
-    }
-
-}
 
 pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'static str> {
     use crate::ast::Token::{*};
@@ -163,10 +17,7 @@ pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'sta
     }
 
     let mut src = match tokens.pop_front().unwrap() {
-        Identifier(ident) => match parse_reg(&ident) {
-            Some(r) => ast::Source::Reg(r),
-            None => return Err("invalid register")
-        },
+        Reg(r) => ast::Source::Reg(r),
         Num(n) => ast::Source::Addr(n),
         Literal => match tokens.pop_front() {
             None => return Err("unexpected end of program"),
@@ -175,7 +26,7 @@ pub fn parse_src(tokens: &mut VecDeque<ast::Token>) -> Result<ast::Source, &'sta
                 _ => return Err("expected number after $")
             }
         }
-        tok => return Err("invalid source or destination")
+        t => return Err("invalid source or destination")
     };
 
     while derefs > 0 {
@@ -247,7 +98,7 @@ pub enum ExprType {
 pub fn expr_type(tok: &ast::Token) -> ExprType {
     use crate::ast::Token::{*};
     match tok {
-        Identifier(ident) => ExprType::Terminal,
+        Reg(_) => ExprType::Terminal,
         Backwards => ExprType::Terminal,
         Forwards => ExprType::Terminal,
         Literal => ExprType::Terminal,
@@ -337,7 +188,7 @@ pub fn parse_expr(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Expr, &'stati
                                     break;
                                 },
                                 _ => match op_pop(&mut operators, &mut operands){
-                                    Ok(res) => continue,
+                                    Ok(_) => continue,
                                     Err(e) => return Err(e)
                                 }
                             };
@@ -353,9 +204,9 @@ pub fn parse_expr(mut q: &mut VecDeque<ast::Token>) -> Result<ast::Expr, &'stati
                 match q.front().unwrap() {
                     Open => operators.push(q.pop_front().unwrap()),
                     _ => {
-                        while (operators.len() > 0) {
+                        while operators.len() > 0 {
                             let top = &operators[operators.len() - 1];
-                            if(precedence(top) < precedence(q.front().unwrap())) {
+                            if precedence(top) < precedence(q.front().unwrap()) {
                                 break;
                             }
                             match op_pop(&mut operators, &mut operands){
@@ -399,17 +250,20 @@ pub fn parse_cond(mut q: &mut VecDeque<ast::Token>) -> Result<Option<ast::Expr>,
                 parse_expr(&mut q).map(|expr| Some(expr))
             }
             Newlines(_) => Ok(None),
-            _ => Err("Expected if condition or newline")
+            _ => {
+                println!("{:?}",q);
+                Err("Expected if condition or newline")
+            }
         }
     }
 }
 
-pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, (usize, &'static str)> {
+pub fn parse(tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, (usize, &'static str)> {
     use crate::ast::Token::{*};
     let mut q = VecDeque::from(tokens);
     let mut lines = vec![];
     let mut lineno = 1;
-    let mut src: Option<ast::Source> = None;
+
     'start: while !q.is_empty() {
         let mut label: Option<String> = None;
         // read label
@@ -419,10 +273,7 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, (usize, &'st
                 lineno += n;
                 match label {
                     Some(_) => return Err((lineno, "no newline after label")),
-                    None => {
-                        label = None;
-                        continue;
-                    }
+                    None => continue
                 }
             },
             Identifier(ident) => match q.pop_front() {

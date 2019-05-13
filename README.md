@@ -1,4 +1,19 @@
 # Moonwalk
+A language that does different things going forwards and backwards.
+The syntax is assembly inspired for some simplicity, but due to the
+fact that things can be revered, it supports more complicated if
+expressions. This is because it becomes hard to reason about or
+seemingly impossible to have certain conditions work both forwards
+and backwards using Assembly like compares or simple conditionals.  
+
+**I'd like to emphasize that going into this project neither of us
+had written any rust code**
+
+## Authors
+Mickey J Winters(mjw271) and Alex Parson(aep143)
+
+## Writeup
+for more detail see the [writeup](WRITEUP.md)
 
 ## Running this project
 A version compiled for linux x86 and x86_64 are included in the repo so
