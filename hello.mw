@@ -1,0 +1,5 @@
+halt if backwards
+io $0x20 if backwards ; \n
+io $0x69 if backwards ; i
+io $0x68 if backwards ; h
+backwards
