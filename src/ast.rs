@@ -74,5 +74,6 @@ pub enum Expr {
 pub struct Line {
     pub label: Option<String>,
     pub inst: Instruction,
-    pub cond: Option<Expr>
+    pub cond: Option<Expr>,
+    pub stack: std::vec::Vec<usize>
 }

@@ -19,7 +19,7 @@ fn moonwalk_main() {
             return;
         }
     };
-    let program = match self::parse::parse(tokens) {
+    let mut program = match self::parse::parse(tokens) {
         std::result::Result::Ok(prg) => prg,
         std::result::Result::Err((lineno, e)) => {
             println!("PARSE ERROR ON LINE {}: {}", lineno, e);
@@ -37,75 +37,18 @@ fn moonwalk_main() {
             println!("{:?}", labels);
             labels
         },
+        eval::ScanResult::Duplicate(dup) => {
+            println!("ERROR: Duplicate Label Found:");
+            println!("{}", dup);
+            return;
+        }
         eval::ScanResult::Ok(labels) => labels
     };
     let mut init_ctx = self::eval::Context::new(labels);
-    self::eval::eval(program, &mut init_ctx);
+    self::eval::eval(&mut program, &mut init_ctx);
 }
 
 fn main() {
     moonwalk_main();
     //printInput();
-}
-
-fn infiniteA(){
-    let line1 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Forwards,
-        cond: None,
-    };
-    let line2 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Io(ast::Source::Literal(65)),
-        cond: Some(ast::Expr::Forwards),
-    };
-    let line3 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Backwards,
-        cond: None,
-    };
-    let line4 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Halt,
-        cond: None,
-    };
-    let mut vec = Vec::new();
-    vec.push(line1);
-    vec.push(line2);
-    vec.push(line3);
-    vec.push(line4);
-    let mut init_ctx = self::eval::Context::new(HashMap::new());
-    self::eval::eval(vec, &mut init_ctx);
-}
-
-fn printInput(){
-
-    let line1 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Forwards,
-        cond: None,
-    };
-    let line2 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Io(ast::Source::Reg(ast::Register::A)),
-        cond: None,//Some(ast::Expr::Forwards),
-    };
-    let line3 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Backwards,
-        cond: None,
-    };
-    let line4 = ast::Line{
-        label: None,
-        inst: ast::Instruction::Halt,
-        cond: None,
-    };
-    let mut vec = Vec::new();
-    vec.push(line1);
-    vec.push(line2);
-    vec.push(line3);
-    vec.push(line4);
-    let mut init_ctx = self::eval::Context::new(HashMap::new());
-    self::eval::eval(vec, &mut init_ctx);
-
 }

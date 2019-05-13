@@ -1,0 +1,9 @@
+jump start
+printA: from
+io A if (backwards)
+backwards
+
+backwards
+io A if (backwards)
+start: inc A $65 if (forwards)
+backwards

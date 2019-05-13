@@ -99,7 +99,7 @@ pub fn eval_expr(expr: &ast::Expr, ctx: &Context) -> bool {
 
 pub fn jump_to_label(label: &String , ctx: &mut Context){
     match ctx.labels.get(label){
-        Some(lineno) => ctx.pc = *lineno,
+        Some(lineno) => {ctx.pc = *lineno;},
         None =>(),
     }
 }
@@ -107,18 +107,35 @@ pub fn jump_to_label(label: &String , ctx: &mut Context){
 pub enum ScanResult {
     Missing(Vec<String>),
     Unused(Vec<String>, HashMap<String, usize>),
+    Duplicate(String),
     Ok(HashMap<String, usize>)
 }
 
 // scan a program to get label lookup table
 pub fn scan_labels(program: &Vec<ast::Line>) -> ScanResult {
-    return ScanResult::Ok(HashMap::new());
+    let mut map = HashMap::new();
+    let mut c =0;
+    for line in program{
+        match &line.label{
+            Some(lbl) => {
+                let cpy = lbl.clone();
+                if(map.contains_key(lbl)){
+                    return ScanResult::Duplicate(cpy);
+                }
+                map.insert(cpy, (c as usize));
+            },
+            None=>()
+        }
+        c +=1;
+    }
+    return ScanResult::Ok(map);
 }
 
 
-pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
+pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context,) -> (bool, bool, bool){
     match inst{
         ast::Instruction::Inc(dest, src) =>{
+            println!("INCREMENT");
             let srcval = source_to_val(src, ctx);
             let destval = match dest{
                 ast::Dest::Reg(reg) => get_reg_val(reg, ctx),
@@ -138,41 +155,41 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
                 ast::Dest::Deref(dst) => ctx.mem[deref_dest(dest, ctx)] = newval,//TODO deref_dest function
             }
 
-            false
+            (false, false, false)
         },
         ast::Instruction::Jump(lbl) =>{
             if(ctx.forward){
                 match lbl{
-                    Some(label) => jump_to_label(label,ctx),
-                    None => (), //Pop Stack and go
+                    Some(label) => {println!("JUMP {}", label); jump_to_label(label,ctx); return (false, true, false)},
+                    None => {return (false, false, true)}, //Pop Stack and go
                 }
             }
-            false
+            (false, false, false)
         },
         ast::Instruction::From(lbl) =>{
             if(!ctx.forward){
                 match lbl{
-                    Some(label) => jump_to_label(label,ctx),
-                    None => (), //Pop Stack and go
+                    Some(label) => {jump_to_label(label,ctx); return (false, true, false)},
+                    None => {return (false, false, true)}, //Pop Stack and go
                 }
 
             }
-            false
+            (false, false, false)
         },
         ast::Instruction::Forwards => {
             ctx.forward = true;
-            false
+            (false, false, false)
         },
         ast::Instruction::Backwards => {
             ctx.forward = false;
-            false
+            (false, false, false)
         },
         ast::Instruction::Reverse => {
             ctx.forward = !ctx.forward;
-            false
+            (false, false, false)
         },
         ast::Instruction::Io(src) => {
-            if(ctx.forward){
+            if(!ctx.forward){
                 let val = source_to_val(src, ctx);
                 let val = [val as u8];
                 let output = str::from_utf8(&val).expect("not UTF-8");
@@ -189,33 +206,47 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
                     ast::Source::Deref(src) => ctx.mem[source_to_val(src, ctx)] = inp,
                 }
             }
-            false
+            (false, false, false)
         },
         ast::Instruction::Halt => {
             println!("Program Halted");
-            true
+            (true, false, false)
         },
     }
 }
 
 
 // evaluate a program
-pub fn eval(program: Vec<self::ast::Line>, ctx: &mut Context) {
+pub fn eval(program: &mut Vec<self::ast::Line>, ctx: &mut Context) {
+    let mut program = program;
     loop{
+        let currentPC = ctx.pc.clone();
         let mut halted = false;
-        let current_line = &program[ctx.pc];
+        let mut jumped = false;
+        let mut tojump = false;
+        let mut current_line = &program[ctx.pc];
         //Check for option here!!
         match(&current_line.cond){
             Some(cond) => {
                 if(eval_expr(cond, &ctx)){
-                    halted = execute_instruction(&current_line.inst, ctx);
+                    let (halted, jumped, tojump)  = execute_instruction(&current_line.inst, ctx,);
                 }
             },
-            None => halted = execute_instruction(&current_line.inst, ctx), //DO Instruction
+            None => {let (halted, jumped, tojump) = execute_instruction(&current_line.inst, ctx,);}, //DO Instruction
         }
         let end_of_program = (ctx.pc > program.len() && ctx.forward) || (ctx.pc == 0 && !ctx.forward);
         if(halted || end_of_program){
             break;
+        }
+        if(jumped){
+            program[ctx.pc].stack.push(currentPC);
+        }
+        if(tojump){
+            let lineno = program[ctx.pc].stack.pop();
+            ctx.pc = match lineno{
+                None => currentPC,
+                Some(newPC) => newPC
+            };
         }
         if(ctx.forward){
             ctx.pc+=1;
@@ -223,6 +254,8 @@ pub fn eval(program: Vec<self::ast::Line>, ctx: &mut Context) {
         else{
             ctx.pc-=1;
         }
+
+
 
     }
 

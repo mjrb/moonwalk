@@ -447,7 +447,8 @@ pub fn parse(mut tokens: Vec<ast::Token>) -> Result<Vec<ast::Line>, (usize, &'st
             cond: match parse_cond(&mut q) {
                 Ok(cond) => cond,
                 Err(e) => return Err((lineno, e))
-            }
+            },
+            stack: Vec::new(),
         });
 
     }
