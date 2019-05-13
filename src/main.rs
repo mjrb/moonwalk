@@ -47,9 +47,10 @@ fn moonwalk_main() {
 fn main() {
     moonwalk_main();
     //infinite10();
+    //printInput();
 }
 
-fn infinite10(){
+fn infiniteA(){
     let line1 = ast::Line{
         label: None,
         inst: ast::Instruction::Forwards,
@@ -57,7 +58,7 @@ fn infinite10(){
     };
     let line2 = ast::Line{
         label: None,
-        inst: ast::Instruction::Io(ast::Source::Literal(10)),
+        inst: ast::Instruction::Io(ast::Source::Literal(65)),
         cond: Some(ast::Expr::Forwards),
     };
     let line3 = ast::Line{
@@ -77,4 +78,36 @@ fn infinite10(){
     vec.push(line4);
     let mut init_ctx = self::eval::Context::new(HashMap::new());
     self::eval::eval(vec, &mut init_ctx);
+}
+
+fn printInput(){
+
+    let line1 = ast::Line{
+        label: None,
+        inst: ast::Instruction::Forwards,
+        cond: None,
+    };
+    let line2 = ast::Line{
+        label: None,
+        inst: ast::Instruction::Io(ast::Source::Reg(ast::Register::A)),
+        cond: None,//Some(ast::Expr::Forwards),
+    };
+    let line3 = ast::Line{
+        label: None,
+        inst: ast::Instruction::Backwards,
+        cond: None,
+    };
+    let line4 = ast::Line{
+        label: None,
+        inst: ast::Instruction::Halt,
+        cond: None,
+    };
+    let mut vec = Vec::new();
+    vec.push(line1);
+    vec.push(line2);
+    vec.push(line3);
+    vec.push(line4);
+    let mut init_ctx = self::eval::Context::new(HashMap::new());
+    self::eval::eval(vec, &mut init_ctx);
+
 }
