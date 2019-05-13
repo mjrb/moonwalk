@@ -193,7 +193,7 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context,) -> (bool
                 let val = source_to_val(src, ctx);
                 let val = [val as u8];
                 let output = str::from_utf8(&val).expect("not UTF-8");
-                println!("{}", output);
+                print!("{}", output);
             }
             else{
                 let mut inp = getc();
