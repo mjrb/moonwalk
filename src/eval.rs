@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::str;
+use std::io::{self, Read};
 
 use crate::ast;
 
@@ -26,6 +28,15 @@ impl Context {
         }
     }
 }
+
+pub fn getc() -> char {
+    let mut buf: [u8; 1] = [0; 1];
+    return match io::stdin().read(&mut buf) {
+        Ok(_) => buf[0] as char,
+        Err(_) => 255 as char
+    }
+}
+
 //TODO: Check rules on deref
 pub fn deref_source(loc:&ast::Source, ctx: &Context) -> usize{
     let location = source_to_val(loc, ctx);
@@ -127,7 +138,6 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
                 ast::Dest::Deref(dst) => ctx.mem[deref_dest(dest, ctx)] = newval,//TODO deref_dest function
             }
 
-
             false
         },
         ast::Instruction::Jump(lbl) =>{
@@ -162,16 +172,22 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context) -> bool{
             false
         },
         ast::Instruction::Io(src) => {
-            let val = source_to_val(src, ctx);
             if(ctx.forward){
-                println!("{}", val);
+                let val = source_to_val(src, ctx);
+                let val = [val as u8];
+                let output = str::from_utf8(&val).expect("not UTF-8");
+                println!("{}", output);
             }
             else{
-                panic!("Cannot take input");
-                //match src{
-                //    ast::Source::Literal => panic!("Cannot place input into a literal"),
-                //
-                //}
+                let mut inp = getc();
+                let inp = inp as usize;
+                //panic!("Cannot take input");
+                match src{
+                    ast::Source::Literal(_) => panic!("Cannot place input into a literal"),
+                    ast::Source::Reg(reg) => set_reg_val(reg, inp, ctx),
+                    ast::Source::Addr(loc) => ctx.mem[*loc] = inp,
+                    ast::Source::Deref(src) => ctx.mem[source_to_val(src, ctx)] = inp,
+                }
             }
             false
         },
