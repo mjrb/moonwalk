@@ -135,7 +135,6 @@ pub fn scan_labels(program: &Vec<ast::Line>) -> ScanResult {
 pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context,) -> (bool, bool, bool){
     match inst{
         ast::Instruction::Inc(dest, src) =>{
-            println!("INCREMENT");
             let srcval = source_to_val(src, ctx);
             let destval = match dest{
                 ast::Dest::Reg(reg) => get_reg_val(reg, ctx),
@@ -160,7 +159,7 @@ pub fn execute_instruction(inst: &ast::Instruction, ctx: &mut Context,) -> (bool
         ast::Instruction::Jump(lbl) =>{
             if(ctx.forward){
                 match lbl{
-                    Some(label) => {println!("JUMP {}", label); jump_to_label(label,ctx); return (false, true, false)},
+                    Some(label) => {jump_to_label(label,ctx); return (false, true, false)},
                     None => {return (false, false, true)}, //Pop Stack and go
                 }
             }
@@ -224,38 +223,77 @@ pub fn eval(program: &mut Vec<self::ast::Line>, ctx: &mut Context) {
         let mut halted = false;
         let mut jumped = false;
         let mut tojump = false;
+        let end_of_program = (ctx.pc >= program.len()) || (currentPC == 0 && !ctx.forward);
+        if(halted || end_of_program){
+            break;
+        }
         let mut current_line = &program[ctx.pc];
+
         //Check for option here!!
         match(&current_line.cond){
             Some(cond) => {
                 if(eval_expr(cond, &ctx)){
-                    let (halted, jumped, tojump)  = execute_instruction(&current_line.inst, ctx,);
+                    let (mhalted, mjumped, mtojump)  = execute_instruction(&current_line.inst, ctx,);
+                    halted = mhalted;
+                    jumped = mjumped;
+                    tojump = mtojump;
                 }
             },
-            None => {let (halted, jumped, tojump) = execute_instruction(&current_line.inst, ctx,);}, //DO Instruction
-        }
-        let end_of_program = (ctx.pc > program.len() && ctx.forward) || (ctx.pc == 0 && !ctx.forward);
-        if(halted || end_of_program){
-            break;
+            None => {
+                let (mhalted, mjumped, mtojump) = execute_instruction(&current_line.inst, ctx,);
+                halted = mhalted;
+                jumped = mjumped;
+                tojump = mtojump;
+
+            }, //DO Instruction
         }
         if(jumped){
             program[ctx.pc].stack.push(currentPC);
-        }
-        if(tojump){
-            let lineno = program[ctx.pc].stack.pop();
-            ctx.pc = match lineno{
-                None => currentPC,
-                Some(newPC) => newPC
-            };
-        }
-        if(ctx.forward){
-            ctx.pc+=1;
+            match &program[ctx.pc].inst{
+                ast::Instruction::Jump(label) =>{
+                    match label{
+                        None => {
+                            if(ctx.forward){
+                                ctx.pc+=1;
+                            }
+                            else{
+                                ctx.pc-=1;
+                            }
+                        },
+                        _=>()
+                    }
+                },
+                ast::Instruction::From(label) => {
+                    match label{
+                        None => {
+                            if(ctx.forward){
+                                ctx.pc+=1;
+                            }
+                            else{
+                                ctx.pc-=1;
+                            }
+                        },
+                        _=>()
+                    }
+                },
+                _=>()
+            }
         }
         else{
-            ctx.pc-=1;
+            if(tojump){
+                let lineno = program[currentPC].stack.pop();
+                ctx.pc = match lineno{
+                    None => currentPC,
+                    Some(newPC) => newPC
+                };
+            }
+            if(ctx.forward){
+                ctx.pc+=1;
+            }
+            else{
+                ctx.pc-=1;
+            }
         }
-
-
 
     }
 

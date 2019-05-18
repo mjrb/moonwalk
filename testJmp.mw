@@ -1,9 +1,9 @@
 jump start
-printA: from
+
+forwards
+printA: jump
 io A if (backwards)
 backwards
 
-backwards
-io A if (backwards)
 start: inc A $65 if (forwards)
-backwards
+jump printA
